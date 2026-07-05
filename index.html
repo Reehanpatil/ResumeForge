@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ResumeForge — Build Your Resume Free</title>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1c2321;
+        --paper: #f7f5f0;
+        --card: #ffffff;
+        --accent: #2f5d50;
+        --accent-soft: #e4efe9;
+        --line: #e4e1d8;
+        --muted: #6b6f6a;
+        --gold: #c99a3b;
+        --danger: #b6483c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #d5d1c4;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c2bdab;
+      }
+
+      /* ---------- Landing ---------- */
+      .landing {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .landing-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 5vw;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        font-family: "Fraunces", serif;
+        font-weight: 600;
+        font-size: 22px;
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: "Fraunces", serif;
+        font-weight: 700;
+        font-size: 15px;
+        transform: rotate(-4deg);
+      }
+      .landing-hero {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 40px;
+        align-items: center;
+        padding: 6vh 5vw;
+        max-width: 1400px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .eyebrow {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--accent-soft);
+        padding: 6px 12px;
+        border-radius: 100px;
+        margin-bottom: 22px;
+      }
+      .eyebrow::before {
+        content: "●";
+        font-size: 8px;
+      }
+      .hero-title {
+        font-family: "Fraunces", serif;
+        font-size: clamp(38px, 5.2vw, 68px);
+        line-height: 1.03;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 0 0 22px 0;
+      }
+      .hero-title em {
+        font-style: italic;
+        color: var(--accent);
+      }
+      .hero-sub {
+        font-size: 17px;
+        line-height: 1.65;
+        color: var(--muted);
+        max-width: 520px;
+        margin-bottom: 34px;
+      }
+      .hero-ctas {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        padding: 14px 26px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          background 0.15s ease;
+      }
+      .btn-primary {
+        background: var(--ink);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(28, 35, 33, 0.25);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--ink);
+        border: 1.5px solid var(--line);
+      }
+      .btn-ghost:hover {
+        border-color: var(--ink);
+      }
+      .hero-stats {
+        display: flex;
+        gap: 28px;
+        margin-top: 40px;
+        padding-top: 28px;
+        border-top: 1px solid var(--line);
+        max-width: 520px;
+      }
+      .stat-num {
+        font-family: "Fraunces", serif;
+        font-size: 26px;
+        font-weight: 600;
+      }
+      .stat-label {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .hero-visual {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mock-card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--card);
+        border-radius: 14px;
+        box-shadow: 0 30px 70px -20px rgba(28, 35, 33, 0.25);
+        padding: 30px;
+        border: 1px solid var(--line);
+        transform: rotate(2deg);
+        position: relative;
+      }
+      .mock-card::before {
+        content: "";
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        right: -16px;
+        bottom: -16px;
+        border: 1.5px solid var(--line);
+        border-radius: 14px;
+        z-index: -1;
+        background: var(--paper);
+      }
+      .mock-top {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+      .mock-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), #4a8a76);
+        flex-shrink: 0;
+      }
+      .mock-name {
+        font-family: "Fraunces", serif;
+        font-weight: 600;
+        font-size: 17px;
+      }
+      .mock-role {
+        font-size: 12px;
+        color: var(--accent);
+        font-family: "IBM Plex Mono", monospace;
+        margin-top: 2px;
+      }
+      .mock-line {
+        height: 8px;
+        background: var(--line);
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+      .mock-section-title {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+        margin: 16px 0 8px;
+      }
+      .mock-tag {
+        display: inline-block;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 10.5px;
+        padding: 4px 10px;
+        border-radius: 100px;
+        margin: 0 5px 5px 0;
+        font-weight: 600;
+      }
+
+      .features-band {
+        padding: 70px 5vw 90px;
+        background: var(--ink);
+        color: #f3f1ea;
+      }
+      .features-head {
+        max-width: 600px;
+        margin: 0 auto 50px;
+        text-align: center;
+      }
+      .features-head .eyebrow {
+        background: rgba(255, 255, 255, 0.08);
+        color: #cfead9;
+      }
+      .features-head h2 {
+        font-family: "Fraunces", serif;
+        font-size: clamp(28px, 3.4vw, 40px);
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        margin: 0;
+      }
+      .feature-grid {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .feature-card {
+        background: #242b28;
+        padding: 32px 28px;
+      }
+      .feature-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 18px;
+        font-size: 18px;
+      }
+      .feature-card h3 {
+        font-family: "Sora", sans-serif;
+        font-size: 16.5px;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      .feature-card p {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: #a9ada4;
+        margin: 0;
+      }
+
+      .landing-footer {
+        text-align: center;
+        padding: 26px;
+        font-size: 12.5px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+      }
+
+      @media (max-width: 900px) {
+        .landing-hero {
+          grid-template-columns: 1fr;
+          padding-top: 20px;
+        }
+        .hero-visual {
+          order: -1;
+          margin-bottom: 10px;
+        }
+        .mock-card {
+          max-width: 320px;
+          transform: none;
+        }
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+        .hero-stats {
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+      }
+
+      /* ---------- Builder App ---------- */
+      .app {
+        display: none;
+        min-height: 100vh;
+        flex-direction: column;
+      }
+      .app.active {
+        display: flex;
+      }
+      .app-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 0;
+        z-index: 40;
+      }
+      .app-topbar .brand {
+        font-size: 18px;
+      }
+      .topbar-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        border: 1.5px solid var(--line);
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 16px;
+        transition: 0.15s;
+      }
+      .icon-btn:hover {
+        border-color: var(--ink);
+      }
+      .score-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--accent-soft);
+        padding: 6px 14px 6px 6px;
+        border-radius: 100px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      .score-ring {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--accent) calc(var(--pct, 0) * 1%),
+          #cfe3da 0
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .score-ring::before {
+        content: "";
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+      }
+
+      .app-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(340px, 460px) 1fr;
+        min-height: 0;
+      }
+      .form-pane {
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        background: var(--card);
+      }
+      .steps-nav {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 16px 20px 0;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .steps-nav::-webkit-scrollbar {
+        display: none;
+      }
+      .step-chip {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+        padding: 8px 13px;
+        border-radius: 100px;
+        background: transparent;
+        color: var(--muted);
+        border: 1.5px solid var(--line);
+        cursor: pointer;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: 0.15s;
+        flex-shrink: 0;
+      }
+      .step-chip.done {
+        color: var(--accent);
+        border-color: var(--accent-soft);
+        background: var(--accent-soft);
+      }
+      .step-chip.active {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+      }
+
+      .form-scroll {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px 28px 100px;
+      }
+      .form-section {
+        display: none;
+        animation: fadeUp 0.35s ease;
+      }
+      .form-section.active {
+        display: block;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .section-title {
+        font-family: "Fraunces", serif;
+        font-size: 24px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .section-desc {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0 0 24px;
+      }
+
+      .field-group {
+        margin-bottom: 18px;
+      }
+      .field-label {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 600;
+        margin-bottom: 7px;
+        color: var(--ink);
+      }
+      .field-label .opt {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      input[type="text"],
+      input[type="email"],
+      input[type="tel"],
+      input[type="url"],
+      input[type="month"],
+      input[type="date"],
+      textarea,
+      select {
+        width: 100%;
+        padding: 11px 13px;
+        border-radius: 9px;
+        border: 1.5px solid var(--line);
+        background: #fdfcf9;
+        font-family: "Inter", sans-serif;
+        font-size: 14px;
+        color: var(--ink);
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 80px;
+        line-height: 1.5;
+      }
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      input::placeholder,
+      textarea::placeholder {
+        color: #b3b0a4;
+      }
+
+      .photo-upload {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .photo-preview {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+        border: 2px dashed var(--line);
+        font-size: 22px;
+        color: var(--accent);
+      }
+      .photo-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .upload-btns {
+        display: flex;
+        gap: 8px;
+      }
+      .btn-sm {
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 9px 14px;
+        border-radius: 8px;
+        border: 1.5px solid var(--line);
+        background: #fff;
+        cursor: pointer;
+      }
+      .btn-sm:hover {
+        border-color: var(--ink);
+      }
+      .btn-sm.danger {
+        color: var(--danger);
+      }
+
+      .repeat-card {
+        border: 1.5px solid var(--line);
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 16px;
+        position: relative;
+        background: #fdfcf9;
+      }
+      .repeat-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .repeat-card-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--accent);
+        font-family: "IBM Plex Mono", monospace;
+      }
+      .remove-x {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 15px;
+      }
+      .remove-x:hover {
+        background: #fbe8e5;
+        color: var(--danger);
+      }
+      .add-btn {
+        width: 100%;
+        padding: 13px;
+        border-radius: 10px;
+        border: 1.5px dashed var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 13.5px;
+        cursor: pointer;
+        transition: 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+      }
+      .add-btn:hover {
+        background: #d5e9de;
+      }
+
+      .skill-tag-input-wrap {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .skill-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .skill-tag {
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 7px 8px 7px 14px;
+        border-radius: 100px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .skill-tag button {
+        background: rgba(0, 0, 0, 0.08);
+        border: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        cursor: pointer;
+        color: inherit;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .skill-level {
+        display: flex;
+        gap: 3px;
+        margin-left: 2px;
+      }
+      .skill-level span {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(47, 93, 80, 0.25);
+      }
+      .skill-level span.on {
+        background: var(--accent);
+      }
+
+      .form-nav {
+        display: flex;
+        justify-content: space-between;
+        padding: 16px 28px;
+        border-top: 1px solid var(--line);
+        background: var(--card);
+        flex-shrink: 0;
+      }
+
+      .preview-pane {
+        background: #eae7dd;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 34px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .preview-toolbar {
+        width: 100%;
+        max-width: 850px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .template-switcher {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .tpl-dot {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+        transition: 0.15s;
+      }
+      .tpl-dot.active {
+        border-color: var(--ink);
+        transform: scale(1.08);
+      }
+
+      .paper-scaler {
+        width: 100%;
+        max-width: 850px;
+      }
+      .paper {
+        width: 100%;
+        background: #fff;
+        box-shadow: 0 20px 60px -15px rgba(28, 35, 33, 0.3);
+        min-height: 1100px;
+        position: relative;
+      }
+      #resumeOutput {
+        width: 100%;
+        height: 100%;
+      }
+
+      .empty-hint {
+        font-size: 11px;
+        color: #c2bfb2;
+        font-style: italic;
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 26px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--ink);
+        color: #fff;
+        padding: 13px 22px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 500;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.3s;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* Mobile preview toggle */
+      .mobile-tabs {
+        display: none;
+      }
+
+      /* ===================== RESPONSIVE: TABLET ===================== */
+      @media (max-width: 960px) {
+        .app-body {
+          grid-template-columns: 1fr;
+        }
+        .form-pane,
+        .preview-pane {
+          display: none;
+          min-width: 0;
+        }
+        .form-pane.mshow,
+        .preview-pane.mshow {
+          display: flex;
+        }
+        .mobile-tabs {
+          display: flex;
+          gap: 0;
+          border-bottom: 1px solid var(--line);
+          background: var(--card);
+          position: sticky;
+          top: 0;
+          z-index: 39;
+        }
+        .mobile-tab {
+          flex: 1;
+          text-align: center;
+          padding: 14px;
+          font-weight: 600;
+          font-size: 13.5px;
+          color: var(--muted);
+          cursor: pointer;
+          border-bottom: 2px solid transparent;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .mobile-tab.active {
+          color: var(--ink);
+          border-color: var(--accent);
+        }
+        .preview-pane {
+          padding: 16px;
+        }
+        .field-row {
+          grid-template-columns: 1fr;
+        }
+        .landing-hero {
+          padding-top: 10px;
+        }
+      }
+
+      /* ===================== RESPONSIVE: MOBILE PHONES ===================== */
+      @media (max-width: 640px) {
+        /* --- Landing --- */
+        .landing-nav {
+          padding: 16px 5vw;
+        }
+        .brand {
+          font-size: 18px;
+        }
+        .brand-mark {
+          width: 26px;
+          height: 26px;
+          font-size: 13px;
+        }
+        .landing-nav .btn {
+          padding: 11px 16px;
+          font-size: 13.5px;
+        }
+        .landing-hero {
+          padding: 24px 6vw 10px;
+          gap: 28px;
+        }
+        .hero-title {
+          font-size: clamp(30px, 9vw, 40px);
+        }
+        .hero-sub {
+          font-size: 15px;
+        }
+        .hero-ctas {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .hero-ctas .btn {
+          width: 100%;
+          justify-content: center;
+        }
+        .hero-stats {
+          gap: 16px;
+          justify-content: space-between;
+        }
+        .stat-num {
+          font-size: 21px;
+        }
+        .stat-label {
+          font-size: 11px;
+        }
+        .mock-card {
+          max-width: 280px;
+          padding: 22px;
+        }
+        .features-band {
+          padding: 50px 6vw 60px;
+        }
+        .feature-card {
+          padding: 26px 22px;
+        }
+
+        /* --- App topbar: stack + shrink so nothing overflows --- */
+        .app-topbar {
+          padding: 10px 12px;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .app-topbar .brand {
+          font-size: 15px;
+        }
+        .app-topbar .brand-mark {
+          width: 24px;
+          height: 24px;
+          font-size: 12px;
+        }
+        .topbar-actions {
+          gap: 6px;
+          width: 100%;
+          justify-content: space-between;
+        }
+        .score-pill {
+          font-size: 11px;
+          padding: 5px 10px 5px 5px;
+          order: 1;
+        }
+        .score-pill span {
+          display: none;
+        }
+        .score-ring {
+          width: 24px;
+          height: 24px;
+        }
+        .icon-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 15px;
+          order: 2;
+        }
+        .app-topbar .btn-primary {
+          order: 3;
+          flex: 1;
+          justify-content: center;
+          padding: 11px 14px;
+          font-size: 13.5px;
+          white-space: nowrap;
+        }
+
+        /* --- Mobile tabs bigger touch target --- */
+        .mobile-tab {
+          padding: 15px 10px;
+          font-size: 13px;
+        }
+
+        /* --- Steps nav: bigger, thumb-friendly chips --- */
+        .steps-nav {
+          padding: 14px 14px 0;
+          gap: 8px;
+        }
+        .step-chip {
+          padding: 10px 14px;
+          font-size: 12px;
+        }
+
+        /* --- Form area --- */
+        .form-scroll {
+          padding: 18px 16px 90px;
+        }
+        .section-title {
+          font-size: 20px;
+        }
+        .section-desc {
+          font-size: 13px;
+          margin-bottom: 18px;
+        }
+        .field-label {
+          font-size: 12px;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="url"],
+        input[type="month"],
+        input[type="date"],
+        textarea,
+        select {
+          padding: 13px 14px;
+          font-size: 16px;
+        }
+        .field-group {
+          margin-bottom: 16px;
+        }
+        .repeat-card {
+          padding: 15px;
+        }
+        .photo-upload {
+          flex-wrap: wrap;
+        }
+        .upload-btns {
+          flex-wrap: wrap;
+        }
+        .btn-sm {
+          padding: 11px 14px;
+          font-size: 13px;
+        }
+        .add-btn {
+          padding: 15px;
+          font-size: 14px;
+        }
+        .skill-tag-input-wrap {
+          flex-direction: column;
+        }
+        .skill-tag-input-wrap .btn-sm {
+          width: 100%;
+          padding: 13px;
+        }
+        .skill-tag {
+          padding: 9px 10px 9px 15px;
+          font-size: 13.5px;
+        }
+
+        /* --- Form nav buttons: full width, easy thumb reach --- */
+        .form-nav {
+          padding: 12px 16px;
+          gap: 10px;
+        }
+        .form-nav .btn {
+          flex: 1;
+          padding: 14px;
+          font-size: 14px;
+          justify-content: center;
+        }
+
+        /* --- Preview: scale the A4 paper down to fit screen width --- */
+        .preview-pane {
+          padding: 14px 10px 40px;
+          background: #dcd9cd;
+        }
+        .preview-toolbar {
+          margin-bottom: 12px;
+          gap: 8px;
+        }
+        .template-switcher {
+          gap: 6px;
+          flex: 1;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+        .tpl-dot {
+          width: 30px;
+          height: 30px;
+          flex-shrink: 0;
+          font-size: 12px;
+        }
+        #atsBtn {
+          font-size: 11.5px;
+          padding: 8px 11px;
+          white-space: nowrap;
+        }
+
+        .paper-scaler {
+          width: 100%;
+          overflow: hidden;
+          display: flex;
+          justify-content: center;
+        }
+        .paper {
+          width: 850px;
+          flex-shrink: 0;
+          transform-origin: top center;
+          box-shadow: 0 14px 40px -10px rgba(28, 35, 33, 0.3);
+          /* actual scale + wrapper height are set inline by JS (adjustPaperScale)
+       since resume content height is dynamic and a fixed CSS ratio would
+       either clip long resumes or leave blank space under short ones */
+        }
+
+        .toast {
+          left: 12px;
+          right: 12px;
+          transform: translateX(0) translateY(20px);
+          text-align: center;
+          justify-content: center;
+          bottom: 16px;
+          font-size: 13px;
+        }
+        .toast.show {
+          transform: translateX(0) translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============ LANDING PAGE ============ -->
+    <div class="landing" id="landing">
+      <nav class="landing-nav">
+        <div class="brand"><span class="brand-mark">R</span>ResumeForge</div>
+        <button class="btn btn-primary" onclick="launchApp()">
+          Build my resume →
+        </button>
+      </nav>
+
+      <div class="landing-hero">
+        <div>
+          <div class="eyebrow">100% Free · No sign-up</div>
+          <h1 class="hero-title">
+            Your resume,<br /><em>fully written</em>,<br />never blank.
+          </h1>
+          <p class="hero-sub">
+            A guided builder that fills every section as you type — photo,
+            skills, projects, experience — with a live preview so you always see
+            the finished page, not an empty form.
+          </p>
+          <div class="hero-ctas">
+            <button class="btn btn-primary" onclick="launchApp()">
+              ✨ Start building free
+            </button>
+            <button class="btn btn-ghost" onclick="launchApp(true)">
+              See it with sample data
+            </button>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <div class="stat-num">6</div>
+              <div class="stat-label">Resume templates</div>
+            </div>
+            <div>
+              <div class="stat-num">0₹</div>
+              <div class="stat-label">Forever free</div>
+            </div>
+            <div>
+              <div class="stat-num">2 min</div>
+              <div class="stat-label">To a finished PDF</div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="mock-card">
+            <div class="mock-top">
+              <div class="mock-avatar"></div>
+              <div>
+                <div class="mock-name">Aisha Verma</div>
+                <div class="mock-role">PRODUCT DESIGNER</div>
+              </div>
+            </div>
+            <div class="mock-line" style="width: 100%"></div>
+            <div class="mock-line" style="width: 85%"></div>
+            <div class="mock-line" style="width: 60%"></div>
+            <div class="mock-section-title">Skills</div>
+            <span class="mock-tag">Figma</span
+            ><span class="mock-tag">UX Research</span
+            ><span class="mock-tag">Prototyping</span>
+            <div class="mock-section-title">Experience</div>
+            <div class="mock-line" style="width: 90%"></div>
+            <div class="mock-line" style="width: 70%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="features-band">
+        <div class="features-head">
+          <div class="eyebrow">What's inside</div>
+          <h2>Everything a great resume needs</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🧑‍💼</div>
+            <h3>Guided step form</h3>
+            <p>
+              Personal info, education, experience, skills, projects, and
+              contact — one focused step at a time.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>Switchable templates</h3>
+            <p>
+              Six distinct designs, each with its own color, type, and layout
+              personality — swap anytime.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📸</div>
+            <h3>Photo upload</h3>
+            <p>
+              Add a professional photo and see it placed instantly in your
+              chosen template.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🧾</div>
+            <h3>Live preview</h3>
+            <p>
+              Every keystroke updates the real resume on screen — what you see
+              is what you download.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📥</div>
+            <h3>One-click PDF</h3>
+            <p>
+              Export a crisp, print-ready PDF sized correctly for A4 and Letter
+              paper.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Completeness score</h3>
+            <p>
+              A live ring tracks how filled-out your resume is, so nothing gets
+              left blank.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">💾</div>
+            <h3>Auto-saved locally</h3>
+            <p>
+              Your progress saves to your browser automatically — close the tab
+              and pick up later.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🗂️</div>
+            <h3>Multiple resumes</h3>
+            <p>
+              Keep separate saved resumes for different roles or industries.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📱</div>
+            <h3>Fully responsive</h3>
+            <p>
+              Build on your phone, tablet, or laptop — the layout adapts without
+              losing functionality.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="landing-footer">Developed by ❤️ Reehan MP</div>
+    </div>
+
+    <!-- ============ BUILDER APP ============ -->
+    <div class="app" id="app">
+      <div class="app-topbar">
+        <div class="brand" style="cursor: pointer" onclick="goLanding()">
+          <span class="brand-mark">R</span>ResumeForge
+        </div>
+        <div class="topbar-actions">
+          <div class="score-pill">
+            <div class="score-ring" id="scoreRing" style="--pct: 0"></div>
+            <span id="scoreText">0% complete</span>
+          </div>
+          <button
+            class="icon-btn"
+            title="Fill sample data"
+            onclick="fillSample()"
+          >
+            🪄
+          </button>
+          <button
+            class="icon-btn"
+            title="Manage saved resumes"
+            onclick="openManager()"
+          >
+            🗂️
+          </button>
+          <button class="icon-btn" title="Reset" onclick="resetAll()">↺</button>
+          <button
+            class="btn btn-primary"
+            onclick="downloadPDF()"
+            style="padding: 10px 20px"
+          >
+            📥 Download PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-tabs">
+        <div
+          class="mobile-tab active"
+          id="mtabForm"
+          onclick="mobileTab('form')"
+        >
+          ✏️ Edit
+        </div>
+        <div class="mobile-tab" id="mtabPreview" onclick="mobileTab('preview')">
+          👁️ Preview
+        </div>
+      </div>
+
+      <div class="app-body">
+        <div class="form-pane mshow" id="formPane">
+          <div class="steps-nav" id="stepsNav"></div>
+          <div class="form-scroll" id="formScroll"></div>
+          <div class="form-nav">
+            <button class="btn btn-ghost" id="prevBtn" onclick="prevStep()">
+              ← Back
+            </button>
+            <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+              Next →
+            </button>
+          </div>
+        </div>
+
+        <div class="preview-pane" id="previewPane">
+          <div class="preview-toolbar">
+            <div class="template-switcher" id="templateSwitcher"></div>
+            <div style="display: flex; gap: 8px">
+              <button class="btn-sm" onclick="toggleATS()" id="atsBtn">
+                🧩 ATS mode: Off
+              </button>
+            </div>
+          </div>
+          <div class="paper-scaler" id="paperScaler">
+            <div class="paper" id="paper">
+              <div id="resumeOutput"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
