@@ -2,38 +2,51 @@
 const STORAGE_KEY = "resumeforge_data_v1";
 const LIST_KEY = "resumeforge_list_v1";
 
-let state = {
-  template: "sage",
-  ats: false,
-  personal: {
-    name: "",
-    role: "",
-    email: "",
-    phone: "",
-    location: "",
-    website: "",
-    linkedin: "",
-    summary: "",
-    photo: "",
-  },
-  education: [
-    { school: "", degree: "", field: "", start: "", end: "", grade: "" },
-  ],
-  experience: [
-    {
-      company: "",
+function getDefaultState() {
+  return {
+    template: "sage",
+    ats: false,
+    sectionOrder: ["experience", "education", "skills", "projects", "extras"],
+    hiddenSections: [],
+    personal: {
+      name: "",
       role: "",
-      start: "",
-      end: "",
-      current: false,
+      email: "",
+      phone: "",
       location: "",
-      bullets: "",
+      website: "",
+      linkedin: "",
+      summary: "",
+      photo: "",
     },
-  ],
-  skills: [],
-  projects: [{ name: "", link: "", tech: "", desc: "" }],
-  extras: { certifications: "", languages: "", achievements: "" },
-};
+    education: [
+      { school: "", degree: "", field: "", start: "", end: "", grade: "" },
+    ],
+    experience: [
+      {
+        company: "",
+        role: "",
+        start: "",
+        end: "",
+        current: false,
+        location: "",
+        bullets: "",
+      },
+    ],
+    skills: [],
+    projects: [{ name: "", link: "", tech: "", desc: "" }],
+    extras: { certifications: "", languages: "", achievements: "" },
+    academic: {
+      publications: "",
+      research: "",
+      conferences: "",
+      teaching: "",
+      grants: "",
+    },
+  };
+}
+
+let state = getDefaultState();
 
 const TEMPLATES = {
   sage: {
@@ -72,11 +85,19 @@ const TEMPLATES = {
     font: "'IBM Plex Mono', monospace",
     body: "'Inter', sans-serif",
   },
+  academic: {
+    label: "Academic",
+    color: "#4a3728",
+    font: "'Playfair Display', serif",
+    body: "'Inter', sans-serif",
+  },
 };
 
 const SAMPLE = {
   template: "sage",
   ats: false,
+  sectionOrder: ["experience", "education", "skills", "projects", "extras"],
+  hiddenSections: [],
   personal: {
     name: "Aisha Verma",
     role: "Product Designer",
@@ -150,6 +171,17 @@ const SAMPLE = {
     achievements:
       "Speaker at UX India Conference 2023\nDesign mentor at ADPList",
   },
+  academic: {
+    publications:
+      "Verma, A. & Rao, S. (2023). Trust signals in fintech onboarding flows. Journal of Human-Computer Interaction, 41(2), 118-134.\nVerma, A. (2021). Designing for financial inclusion in rural India. UX India Proceedings, 22-29.",
+    research:
+      "Human-centered design for financial inclusion, trust and transparency in fintech interfaces, accessible design for low-literacy users",
+    conferences:
+      "Invited speaker, UX India Conference, Bengaluru, 2023\nPanelist, Design for Bharat Summit, 2022",
+    teaching:
+      "Guest Lecturer, Interaction Design, National Institute of Design, 2022-Present",
+    grants: "NID Research Fellowship, 2018-2019",
+  },
 };
 
 let currentStep = 0;
@@ -161,14 +193,44 @@ const STEPS = [
   { id: "skills", label: "Skills", icon: "⚡" },
   { id: "projects", label: "Projects", icon: "🧩" },
   { id: "extras", label: "Extras", icon: "🏆" },
+  { id: "layout", label: "Layout", icon: "🧱" },
 ];
 
 /* ===================== INIT ===================== */
+// Deep-merges saved data ONTO a fresh default object, field by field.
+// This means if a future update adds a new field (like sectionOrder, or a
+// future one), anyone with old saved data still gets a safe default for it
+// instead of `undefined` — which is what was causing "Cannot read
+// properties of undefined" crashes.
+function deepMergeDefaults(defaults, saved) {
+  if (Array.isArray(defaults)) {
+    return Array.isArray(saved) ? saved : defaults;
+  }
+  if (defaults && typeof defaults === "object") {
+    const out = {};
+    for (const key in defaults) {
+      if (saved && typeof saved === "object" && key in saved) {
+        out[key] = deepMergeDefaults(defaults[key], saved[key]);
+      } else {
+        out[key] = defaults[key];
+      }
+    }
+    return out;
+  }
+  return saved !== undefined && saved !== null ? saved : defaults;
+}
 function loadState() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) state = JSON.parse(saved);
-  } catch (e) {}
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      state = deepMergeDefaults(getDefaultState(), saved);
+    } else {
+      state = getDefaultState();
+    }
+  } catch (e) {
+    state = getDefaultState();
+  }
 }
 function saveState() {
   try {
@@ -178,7 +240,10 @@ function saveState() {
 
 function launchApp(sample) {
   if (sample) {
-    state = JSON.parse(JSON.stringify(SAMPLE));
+    state = deepMergeDefaults(
+      getDefaultState(),
+      JSON.parse(JSON.stringify(SAMPLE)),
+    );
     saveState();
   }
   document.getElementById("landing").style.display = "none";
@@ -223,6 +288,7 @@ function isStepFilled(i) {
       state.extras.languages ||
       state.extras.achievements
     );
+  if (id === "layout") return true;
   return false;
 }
 function goStep(i) {
@@ -254,8 +320,21 @@ function renderFormStep() {
 function field(label, value, attrs, opt) {
   return `<div class="field-group">
     <label class="field-label">${label} ${opt ? '<span class="opt">(optional)</span>' : ""}</label>
-    ${attrs}
+    ${wrapMic(attrs)}
   </div>`;
+}
+// Wraps a single input/textarea markup string with a mic button that fills
+// that same field via the Web Speech API. Only wraps text-like fields
+// (skips checkboxes, month/date pickers, selects) since dictation doesn't
+// make sense there.
+function wrapMic(attrsHtml) {
+  const m = attrsHtml.match(/data-bind="([^"]+)"/);
+  const isTextLike = /<input type="(text|email|tel|url)"|<textarea/.test(
+    attrsHtml,
+  );
+  if (!m || !isTextLike) return attrsHtml;
+  const path = m[1];
+  return `<div class="mic-field-wrap">${attrsHtml}<button type="button" class="mic-btn" title="Speak to fill this field" data-mic-target="${path}" onclick="startVoiceInput(this)">🎤</button></div>`;
 }
 
 const FORM_RENDERERS = {
@@ -302,7 +381,10 @@ const FORM_RENDERERS = {
     <h2 class="section-title">Skills</h2>
     <p class="section-desc">Add skills one at a time — press Enter or click Add. Click the dots to set proficiency.</p>
     <div class="skill-tag-input-wrap">
-      <input type="text" id="skillInput" placeholder="e.g. Figma, Python, Public Speaking" style="flex:1">
+      <div class="mic-field-wrap" style="flex:1;">
+        <input type="text" id="skillInput" placeholder="e.g. Figma, Python, Public Speaking" style="width:100%">
+        <button type="button" class="mic-btn" title="Speak a skill" data-mic-target="__skillInput" onclick="startVoiceInput(this)">🎤</button>
+      </div>
       <button class="btn-sm" onclick="addSkillFromInput()">Add</button>
     </div>
     <div class="skill-tags" id="skillTags">${state.skills.map((s, i) => skillTag(s, i)).join("")}</div>
@@ -320,8 +402,30 @@ const FORM_RENDERERS = {
     ${field("Certifications", "", `<textarea data-bind="extras.certifications" rows="3" placeholder="Google UX Design Certificate (2020)">${esc(state.extras.certifications)}</textarea>`, true)}
     ${field("Languages", "", `<textarea data-bind="extras.languages" rows="2" placeholder="English (Fluent), Hindi (Native)">${esc(state.extras.languages)}</textarea>`, true)}
     ${field("Achievements & Awards", "", `<textarea data-bind="extras.achievements" rows="3" placeholder="Speaker at UX India Conference 2023">${esc(state.extras.achievements)}</textarea>`, true)}
+    ${academicExtrasHTML()}
+  `,
+  layout: () => `
+    <h2 class="section-title">Section order</h2>
+    <p class="section-desc">Drag to reorder how sections appear on your resume. Toggle off any section to hide it without deleting the data.</p>
+    <div class="reorder-list" id="reorderList">${state.sectionOrder.map((id) => reorderItem(id)).join("")}</div>
   `,
 };
+
+const SECTION_META = {
+  experience: { label: "Experience", icon: "💼" },
+  education: { label: "Education", icon: "🎓" },
+  skills: { label: "Skills", icon: "⚡" },
+  projects: { label: "Projects", icon: "🧩" },
+  extras: { label: "Extras", icon: "🏆" },
+};
+function reorderItem(id) {
+  const m = SECTION_META[id];
+  const hidden = state.hiddenSections.includes(id);
+  return `<div class="reorder-item" draggable="true" data-id="${id}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
+    <span class="reorder-handle">⠿</span> ${m.icon} ${m.label}
+    <span class="toggle-visible toggle-switch ${hidden ? "" : "on"}" onclick="toggleSectionVisible('${id}')"></span>
+  </div>`;
+}
 
 function experienceCard(e, i) {
   return `<div class="repeat-card">
@@ -334,6 +438,7 @@ function experienceCard(e, i) {
     </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:-8px 0 18px;color:var(--muted);">
       <input type="checkbox" data-bind="experience.${i}.current" ${e.current ? "checked" : ""} style="width:auto;"> Currently working here
+      ${calcDuration(e.start, e.end, e.current) ? `<span class="duration-badge">${calcDuration(e.start, e.end, e.current)}</span>` : ""}
     </label>
     ${field("Location", "", `<input type="text" data-bind="experience.${i}.location" placeholder="Bengaluru" value="${esc(e.location)}">`, true)}
     ${field("Key achievements", "", `<textarea data-bind="experience.${i}.bullets" rows="4" placeholder="One achievement per line...">${esc(e.bullets)}</textarea>`)}
@@ -545,7 +650,10 @@ function setSkillLevel(i, lvl) {
 
 /* ===================== SAMPLE / RESET ===================== */
 function fillSample() {
-  state = JSON.parse(JSON.stringify(SAMPLE));
+  state = deepMergeDefaults(
+    getDefaultState(),
+    JSON.parse(JSON.stringify(SAMPLE)),
+  );
   saveState();
   renderSteps();
   renderFormStep();
@@ -555,41 +663,13 @@ function fillSample() {
 }
 function resetAll() {
   if (!confirm("Clear all fields and start fresh?")) return;
-  state = {
-    template: state.template,
-    ats: false,
-    personal: {
-      name: "",
-      role: "",
-      email: "",
-      phone: "",
-      location: "",
-      website: "",
-      linkedin: "",
-      summary: "",
-      photo: "",
-    },
-    education: [
-      { school: "", degree: "", field: "", start: "", end: "", grade: "" },
-    ],
-    experience: [
-      {
-        company: "",
-        role: "",
-        start: "",
-        end: "",
-        current: false,
-        location: "",
-        bullets: "",
-      },
-    ],
-    skills: [],
-    projects: [{ name: "", link: "", tech: "", desc: "" }],
-    extras: { certifications: "", languages: "", achievements: "" },
-  };
+  const keepTemplate = state.template;
+  state = getDefaultState();
+  state.template = keepTemplate;
   saveState();
   renderSteps();
   renderFormStep();
+  renderTemplateSwitcher();
   renderPreview();
   updateScore();
   showToast("↺ Cleared — starting fresh");
@@ -796,7 +876,7 @@ function expBlock(color) {
     <div style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px;">
         <div style="font-weight:700;font-size:14.5px;">${esc(e.role) || "Role"}${e.company ? ` · <span style="font-weight:600;color:${color}">${esc(e.company)}</span>` : ""}</div>
-        <div style="font-size:12px;color:#7a7a7a;font-family:'IBM Plex Mono',monospace;">${dateRange(e.start, e.end, e.current)}</div>
+        <div style="font-size:12px;color:#7a7a7a;font-family:'IBM Plex Mono',monospace;">${dateRange(e.start, e.end, e.current)}${calcDuration(e.start, e.end, e.current) ? ` <span style="opacity:0.65;">· ${calcDuration(e.start, e.end, e.current)}</span>` : ""}</div>
       </div>
       ${e.location ? `<div style="font-size:12px;color:#9a9a9a;margin-top:1px;">${esc(e.location)}</div>` : ""}
       ${
@@ -882,6 +962,13 @@ function contactLine() {
   );
   return items.map(esc).join("  ·  ");
 }
+function secOn(id) {
+  return !state.hiddenSections.includes(id);
+}
+function orderIdx(id) {
+  const i = state.sectionOrder.indexOf(id);
+  return i === -1 ? 99 : i;
+}
 
 /* ===================== TEMPLATE RENDERERS ===================== */
 const TEMPLATE_RENDERERS = {
@@ -901,13 +988,13 @@ const TEMPLATE_RENDERERS = {
         ${s.personal.summary ? `<div style="margin-bottom:24px;font-size:13.5px;line-height:1.7;color:#3a3a3a;border-left:3px solid ${c};padding-left:16px;">${esc(s.personal.summary)}</div>` : ""}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:36px;">
           <div>
-            ${s.experience.some((e) => e.company) ? `${sectionLabel("Experience", c)}${expBlock(c)}` : ""}
-            ${s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
+            ${secOn("experience") && s.experience.some((e) => e.company) ? `${sectionLabel("Experience", c)}${expBlock(c)}` : ""}
+            ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
           </div>
           <div>
-            ${s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}
-            ${s.skills.length ? `<div style="margin-top:20px">${sectionLabel("Skills", c)}${skillsInline(c, "#e4efe9")}</div>` : ""}
-            ${s.extras.certifications || s.extras.languages || s.extras.achievements ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
+            ${secOn("education") && s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}
+            ${secOn("skills") && s.skills.length ? `<div style="margin-top:20px">${sectionLabel("Skills", c)}${skillsInline(c, "#e4efe9")}</div>` : ""}
+            ${secOn("extras") && (s.extras.certifications || s.extras.languages || s.extras.achievements) ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
           </div>
         </div>
       </div>
@@ -930,15 +1017,15 @@ const TEMPLATE_RENDERERS = {
           ${s.personal.website ? `🔗 ${esc(s.personal.website)}<br>` : ""}
           ${s.personal.linkedin ? `in ${esc(s.personal.linkedin)}` : ""}
         </div>
-        ${s.skills.length ? `<div style="height:1px;background:rgba(255,255,255,0.2);margin:20px 0;"></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:10px;opacity:0.9;">Skills</div>${s.skills.map((sk) => `<div style="font-size:12px;margin-bottom:7px;">${esc(sk.name)}<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-top:3px;"><div style="height:100%;width:${sk.level * 20}%;background:#fff;border-radius:2px;"></div></div></div>`).join("")}` : ""}
+        ${secOn("skills") && s.skills.length ? `<div style="height:1px;background:rgba(255,255,255,0.2);margin:20px 0;"></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:10px;opacity:0.9;">Skills</div>${s.skills.map((sk) => `<div style="font-size:12px;margin-bottom:7px;">${esc(sk.name)}<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-top:3px;"><div style="height:100%;width:${sk.level * 20}%;background:#fff;border-radius:2px;"></div></div></div>`).join("")}` : ""}
         ${s.extras.languages ? `<div style="height:1px;background:rgba(255,255,255,0.2);margin:20px 0;"></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:8px;opacity:0.9;">Languages</div><div style="font-size:11.5px;opacity:0.85;line-height:1.6;">${esc(s.extras.languages)}</div>` : ""}
       </div>
       <div style="padding:36px 40px;">
         ${s.personal.summary ? `<div style="margin-bottom:22px;font-size:13.5px;line-height:1.7;color:#3a3a3a;">${esc(s.personal.summary)}</div>` : ""}
-        ${s.experience.some((e) => e.company) ? `${sectionLabel("Experience", c)}${expBlock(c)}` : ""}
-        ${s.education.some((e) => e.school) ? `<div style="margin-top:20px">${sectionLabel("Education", c)}${eduBlock()}</div>` : ""}
-        ${s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
-        ${s.extras.certifications || s.extras.achievements ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
+        ${secOn("experience") && s.experience.some((e) => e.company) ? `${sectionLabel("Experience", c)}${expBlock(c)}` : ""}
+        ${secOn("education") && s.education.some((e) => e.school) ? `<div style="margin-top:20px">${sectionLabel("Education", c)}${eduBlock()}</div>` : ""}
+        ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
+        ${secOn("extras") && (s.extras.certifications || s.extras.achievements) ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
       </div>
     </div>`;
   },
@@ -955,13 +1042,13 @@ const TEMPLATE_RENDERERS = {
       </div>
       <div style="height:1.5px;background:${c};width:60px;margin:0 auto 28px;"></div>
       ${s.personal.summary ? `<div style="text-align:center;max-width:560px;margin:0 auto 30px;font-size:13.5px;line-height:1.75;color:#4a4a4a;font-style:italic;">${esc(s.personal.summary)}</div>` : ""}
-      ${s.experience.some((e) => e.company) ? `<div style="margin-bottom:26px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
+      ${secOn("experience") && s.experience.some((e) => e.company) ? `<div style="margin-bottom:26px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:36px;">
-        <div>${s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}</div>
-        <div>${s.skills.length ? `${sectionLabel("Skills", c)}${skillsInline(c, "#f5e6de")}` : ""}</div>
+        <div>${secOn("education") && s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}</div>
+        <div>${secOn("skills") && s.skills.length ? `${sectionLabel("Skills", c)}${skillsInline(c, "#f5e6de")}` : ""}</div>
       </div>
-      ${s.projects.some((p) => p.name) ? `<div style="margin-top:24px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
-      ${s.extras.certifications || s.extras.languages || s.extras.achievements ? `<div style="margin-top:24px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
+      ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-top:24px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
+      ${secOn("extras") && (s.extras.certifications || s.extras.languages || s.extras.achievements) ? `<div style="margin-top:24px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
     </div>`;
   },
 
@@ -979,11 +1066,11 @@ const TEMPLATE_RENDERERS = {
       </div>
       ${!state.ats ? `<div style="font-size:11.5px;color:#666;margin:-14px 0 22px;">${contactLine()}</div>` : ""}
       ${s.personal.summary ? `<div style="margin-bottom:22px;font-size:13.5px;line-height:1.7;color:#3a3a3a;">${esc(s.personal.summary)}</div>` : ""}
-      ${s.experience.some((e) => e.company) ? `<div style="margin-bottom:22px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
-      ${s.education.some((e) => e.school) ? `<div style="margin-bottom:22px">${sectionLabel("Education", c)}${eduBlock()}</div>` : ""}
-      ${s.skills.length ? `<div style="margin-bottom:22px">${sectionLabel("Skills", c)}<div style="font-size:13px;color:#3a3a3a;">${s.skills.map((sk) => esc(sk.name)).join("  •  ")}</div></div>` : ""}
-      ${s.projects.some((p) => p.name) ? `<div style="margin-bottom:22px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
-      ${s.extras.certifications || s.extras.languages || s.extras.achievements ? `<div>${sectionLabel("Additional", c)}${extrasBlock(c)}</div>` : ""}
+      ${secOn("experience") && s.experience.some((e) => e.company) ? `<div style="margin-bottom:22px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
+      ${secOn("education") && s.education.some((e) => e.school) ? `<div style="margin-bottom:22px">${sectionLabel("Education", c)}${eduBlock()}</div>` : ""}
+      ${secOn("skills") && s.skills.length ? `<div style="margin-bottom:22px">${sectionLabel("Skills", c)}<div style="font-size:13px;color:#3a3a3a;">${s.skills.map((sk) => esc(sk.name)).join("  •  ")}</div></div>` : ""}
+      ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-bottom:22px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
+      ${secOn("extras") && (s.extras.certifications || s.extras.languages || s.extras.achievements) ? `<div>${sectionLabel("Additional", c)}${extrasBlock(c)}</div>` : ""}
     </div>`;
   },
 
@@ -999,13 +1086,13 @@ const TEMPLATE_RENDERERS = {
       <div style="height:1px;background:linear-gradient(90deg,${c},transparent);margin-bottom:14px;"></div>
       <div style="font-size:11.5px;color:#8a8a8a;margin-bottom:24px;">${contactLine()}</div>
       ${s.personal.summary ? `<div style="margin-bottom:26px;font-size:13.5px;line-height:1.75;color:#3a3a3a;">${esc(s.personal.summary)}</div>` : ""}
-      ${s.experience.some((e) => e.company) ? `<div style="margin-bottom:24px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
+      ${secOn("experience") && s.experience.some((e) => e.company) ? `<div style="margin-bottom:24px">${sectionLabel("Experience", c)}${expBlock(c)}</div>` : ""}
       <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:34px;">
-        <div>${s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}
-          ${s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
+        <div>${secOn("education") && s.education.some((e) => e.school) ? `${sectionLabel("Education", c)}${eduBlock()}` : ""}
+          ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-top:20px">${sectionLabel("Projects", c)}${projBlock(c)}</div>` : ""}
         </div>
-        <div>${s.skills.length ? `${sectionLabel("Skills", c)}${skillsInline(c, "#f3ead3")}` : ""}
-          ${s.extras.certifications || s.extras.languages || s.extras.achievements ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
+        <div>${secOn("skills") && s.skills.length ? `${sectionLabel("Skills", c)}${skillsInline(c, "#f3ead3")}` : ""}
+          ${secOn("extras") && (s.extras.certifications || s.extras.languages || s.extras.achievements) ? `<div style="margin-top:20px">${sectionLabel("More", c)}${extrasBlock(c)}</div>` : ""}
         </div>
       </div>
     </div>`;
@@ -1024,11 +1111,189 @@ const TEMPLATE_RENDERERS = {
       </div>
       <div style="font-size:11px;color:#666;margin:10px 0 20px;">${contactLine()}</div>
       ${s.personal.summary ? `<div style="margin-bottom:20px;padding:12px 14px;background:#f4f4f4;border-left:3px solid ${c};font-size:12px;line-height:1.6;">${esc(s.personal.summary)}</div>` : ""}
-      ${s.experience.some((e) => e.company) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ experience</div>${expBlock(c)}</div>` : ""}
-      ${s.education.some((e) => e.school) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ education</div>${eduBlock()}</div>` : ""}
-      ${s.skills.length ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ skills</div><div>${s.skills.map((sk) => `<span style="display:inline-block;background:#eee;padding:4px 9px;border-radius:4px;margin:0 6px 6px 0;font-size:11px;">${esc(sk.name)}</span>`).join("")}</div></div>` : ""}
-      ${s.projects.some((p) => p.name) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ projects</div>${projBlock(c)}</div>` : ""}
-      ${s.extras.certifications || s.extras.languages || s.extras.achievements ? `<div><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ more</div>${extrasBlock(c)}</div>` : ""}
+      ${secOn("experience") && s.experience.some((e) => e.company) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ experience</div>${expBlock(c)}</div>` : ""}
+      ${secOn("education") && s.education.some((e) => e.school) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ education</div>${eduBlock()}</div>` : ""}
+      ${secOn("skills") && s.skills.length ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ skills</div><div>${s.skills.map((sk) => `<span style="display:inline-block;background:#eee;padding:4px 9px;border-radius:4px;margin:0 6px 6px 0;font-size:11px;">${esc(sk.name)}</span>`).join("")}</div></div>` : ""}
+      ${secOn("projects") && s.projects.some((p) => p.name) ? `<div style="margin-bottom:20px"><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ projects</div>${projBlock(c)}</div>` : ""}
+      ${secOn("extras") && (s.extras.certifications || s.extras.languages || s.extras.achievements) ? `<div><div style="font-size:11.5px;font-weight:700;color:${c};margin-bottom:10px;">$ more</div>${extrasBlock(c)}</div>` : ""}
+    </div>`;
+  },
+
+  /* ---- 7. ACADEMIC: dense, formal, publication-first CV ---- */
+  // Academic committees read top-to-bottom, not a 6-second scan, so this
+  // trades the colourful header blocks of the other templates for a plain
+  // formal document look: centered name, a thin double rule, single column,
+  // and a numbered publications list — the one section no other template
+  // has, and the one every academic CV is judged on first.
+  academic: (s) => {
+    const c = TEMPLATES.academic.color;
+    const a = s.academic || {
+      publications: "",
+      research: "",
+      conferences: "",
+      teaching: "",
+      grants: "",
+    };
+    const pubList = linesToList(a.publications);
+    return `<div style="font-family:'Inter',sans-serif;color:#242018;padding:46px 50px;">
+      <div style="text-align:center;margin-bottom:6px;">
+        <div style="font-family:'Playfair Display',serif;font-size:27px;font-weight:700;letter-spacing:0.01em;">${esc(s.personal.name) || "Your Name"}</div>
+        ${s.personal.role ? `<div style="font-size:12.5px;color:${c};margin-top:3px;font-style:italic;">${esc(s.personal.role)}</div>` : ""}
+      </div>
+      <div style="text-align:center;font-size:11px;color:#726a5c;margin-bottom:10px;">${contactLine()}</div>
+      <div style="height:1px;background:${c};margin-bottom:2px;"></div>
+      <div style="height:1px;background:${c};margin-bottom:22px;opacity:0.35;"></div>
+
+      ${s.personal.summary ? `<div style="margin-bottom:22px;font-size:12.5px;line-height:1.75;color:#3a3428;">${esc(s.personal.summary)}</div>` : ""}
+
+      ${
+        secOn("education") && s.education.some((e) => e.school) ?
+          `
+        <div style="margin-bottom:22px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:${c};border-bottom:1px solid ${c};padding-bottom:4px;margin-bottom:12px;">Education</div>
+          ${s.education
+            .filter((e) => e.school)
+            .map(
+              (e) => `
+            <div style="margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                <div style="font-weight:700;font-size:13px;">${esc(e.degree)}${e.field ? ", " + esc(e.field) : ""}</div>
+                <div style="font-size:11px;color:#726a5c;font-family:'IBM Plex Mono',monospace;">${dateRange(e.start, e.end, false)}</div>
+              </div>
+              <div style="font-size:12px;font-style:italic;color:#4a4335;">${esc(e.school)}${e.grade ? " · " + esc(e.grade) : ""}</div>
+            </div>
+          `,
+            )
+            .join("")}
+        </div>`
+        : ""
+      }
+
+      ${
+        pubList.length ?
+          `
+        <div style="margin-bottom:22px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:${c};border-bottom:1px solid ${c};padding-bottom:4px;margin-bottom:12px;">Publications</div>
+          <ol style="margin:0;padding-left:20px;">
+            ${pubList.map((p) => `<li style="font-size:12px;line-height:1.65;margin-bottom:8px;color:#3a3428;">${esc(p)}</li>`).join("")}
+          </ol>
+        </div>`
+        : ""
+      }
+
+      ${
+        secOn("experience") && s.experience.some((e) => e.company) ?
+          `
+        <div style="margin-bottom:22px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:${c};border-bottom:1px solid ${c};padding-bottom:4px;margin-bottom:12px;">Academic & Professional Experience</div>
+          ${s.experience
+            .filter((e) => e.company || e.role)
+            .map(
+              (e) => `
+            <div style="margin-bottom:13px;">
+              <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                <div style="font-weight:700;font-size:13px;">${esc(e.role) || "Role"}, <span style="font-style:italic;font-weight:400;">${esc(e.company)}</span></div>
+                <div style="font-size:11px;color:#726a5c;font-family:'IBM Plex Mono',monospace;">${dateRange(e.start, e.end, e.current)}</div>
+              </div>
+              ${
+                e.bullets ?
+                  `<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.6;color:#3a3428;">${linesToList(
+                    e.bullets,
+                  )
+                    .map((b) => `<li>${esc(b)}</li>`)
+                    .join("")}</ul>`
+                : ""
+              }
+            </div>
+          `,
+            )
+            .join("")}
+        </div>`
+        : ""
+      }
+
+      ${
+        a.teaching ?
+          `
+        <div style="margin-bottom:22px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:${c};border-bottom:1px solid ${c};padding-bottom:4px;margin-bottom:12px;">Teaching Experience</div>
+          ${linesToList(a.teaching)
+            .map(
+              (t) =>
+                `<div style="font-size:12px;line-height:1.6;color:#3a3428;margin-bottom:4px;">${esc(t)}</div>`,
+            )
+            .join("")}
+        </div>`
+        : ""
+      }
+
+      ${
+        a.conferences ?
+          `
+        <div style="margin-bottom:22px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:${c};border-bottom:1px solid ${c};padding-bottom:4px;margin-bottom:12px;">Conferences &amp; Presentations</div>
+          ${linesToList(a.conferences)
+            .map(
+              (t) =>
+                `<div style="font-size:12px;line-height:1.6;color:#3a3428;margin-bottom:4px;">${esc(t)}</div>`,
+            )
+            .join("")}
+        </div>`
+        : ""
+      }
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;">
+        <div>
+          ${
+            a.research ?
+              `
+            <div style="margin-bottom:18px;">
+              <div style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:${c};margin-bottom:8px;">Research Interests</div>
+              <div style="font-size:12px;line-height:1.65;color:#3a3428;">${esc(a.research)}</div>
+            </div>`
+            : ""
+          }
+          ${
+            a.grants ?
+              `
+            <div>
+              <div style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:${c};margin-bottom:8px;">Grants &amp; Funding</div>
+              ${linesToList(a.grants)
+                .map(
+                  (t) =>
+                    `<div style="font-size:12px;line-height:1.6;color:#3a3428;">${esc(t)}</div>`,
+                )
+                .join("")}
+            </div>`
+            : ""
+          }
+        </div>
+        <div>
+          ${
+            secOn("skills") && s.skills.length ?
+              `
+            <div style="margin-bottom:18px;">
+              <div style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:${c};margin-bottom:8px;">Skills</div>
+              <div style="font-size:12px;line-height:1.8;color:#3a3428;">${s.skills.map((sk) => esc(sk.name)).join(" · ")}</div>
+            </div>`
+            : ""
+          }
+          ${
+            (
+              secOn("extras") &&
+              (s.extras.certifications ||
+                s.extras.languages ||
+                s.extras.achievements)
+            ) ?
+              `
+            <div>
+              <div style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:${c};margin-bottom:8px;">Additional</div>
+              ${extrasBlock(c)}
+            </div>`
+            : ""
+          }
+        </div>
+      </div>
     </div>`;
   },
 };
@@ -1162,7 +1427,7 @@ function saveCurrentAs() {
 }
 function loadResumeFromList(i) {
   const list = getResumeList();
-  state = JSON.parse(JSON.stringify(list[i].data));
+  state = deepMergeDefaults(getDefaultState(), list[i].data);
   saveState();
   document
     .querySelectorAll('div[style*="position:fixed"]')
@@ -1183,4 +1448,658 @@ function deleteResumeFromList(i) {
     .querySelectorAll('div[style*="position:fixed"]')
     .forEach((el) => el.remove());
   openManager();
+}
+
+/* ===================== DARK MODE ===================== */
+function toggleDarkMode() {
+  const isDark = document.documentElement.classList.toggle("dark");
+  localStorage.setItem("resumeforge_dark", isDark ? "1" : "0");
+  document.getElementById("darkModeBtn").textContent = isDark ? "☀️" : "🌙";
+  showToast(isDark ? "🌙 Dark mode on" : "☀️ Light mode on");
+}
+function initDarkMode() {
+  const saved = localStorage.getItem("resumeforge_dark");
+  if (saved === "1") {
+    document.documentElement.classList.add("dark");
+    const btn = document.getElementById("darkModeBtn");
+    if (btn) btn.textContent = "☀️";
+  }
+}
+
+/* ===================== COPY RESUME AS TEXT (ATS) ===================== */
+function buildPlainTextResume() {
+  const p = state.personal;
+  let lines = [];
+  lines.push(p.name || "Your Name");
+  if (p.role) lines.push(p.role);
+  lines.push(
+    [p.email, p.phone, p.location, p.website, p.linkedin]
+      .filter(Boolean)
+      .join(" | "),
+  );
+  lines.push("");
+  if (p.summary) {
+    lines.push("SUMMARY");
+    lines.push(p.summary);
+    lines.push("");
+  }
+  if (state.experience.some((e) => e.company)) {
+    lines.push("EXPERIENCE");
+    state.experience
+      .filter((e) => e.company || e.role)
+      .forEach((e) => {
+        lines.push(
+          `${e.role || ""} - ${e.company || ""} (${dateRange(e.start, e.end, e.current)})`,
+        );
+        if (e.location) lines.push(e.location);
+        linesToList(e.bullets).forEach((b) => lines.push("- " + b));
+        lines.push("");
+      });
+  }
+  if (state.education.some((e) => e.school)) {
+    lines.push("EDUCATION");
+    state.education
+      .filter((e) => e.school)
+      .forEach((e) => {
+        lines.push(
+          `${e.degree || ""} ${e.field ? "in " + e.field : ""} - ${e.school} (${dateRange(e.start, e.end, false)})`,
+        );
+        if (e.grade) lines.push(e.grade);
+        lines.push("");
+      });
+  }
+  if (state.skills.length) {
+    lines.push("SKILLS");
+    lines.push(state.skills.map((s) => s.name).join(", "));
+    lines.push("");
+  }
+  if (state.projects.some((pr) => pr.name)) {
+    lines.push("PROJECTS");
+    state.projects
+      .filter((pr) => pr.name)
+      .forEach((pr) => {
+        lines.push(`${pr.name}${pr.link ? " - " + pr.link : ""}`);
+        if (pr.tech) lines.push(pr.tech);
+        if (pr.desc) lines.push(pr.desc);
+        lines.push("");
+      });
+  }
+  if (state.extras.certifications) {
+    lines.push("CERTIFICATIONS");
+    lines.push(state.extras.certifications);
+    lines.push("");
+  }
+  if (state.extras.languages) {
+    lines.push("LANGUAGES");
+    lines.push(state.extras.languages);
+    lines.push("");
+  }
+  if (state.extras.achievements) {
+    lines.push("ACHIEVEMENTS");
+    lines.push(state.extras.achievements);
+  }
+  return lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+async function copyResumeText() {
+  if (!hasAny()) {
+    showToast("⚠️ Fill in some details first");
+    return;
+  }
+  const text = buildPlainTextResume();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("📋 Plain-text resume copied — paste into any ATS form");
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+    showToast("📋 Copied to clipboard");
+  }
+}
+
+/* ===================== COVER LETTER GENERATOR ===================== */
+function generateCoverLetter(company, roleTitle) {
+  const p = state.personal;
+  const topExp = state.experience.find((e) => e.company);
+  const topSkills = state.skills
+    .slice(0, 4)
+    .map((s) => s.name)
+    .join(", ");
+  const role = roleTitle || p.role || "this role";
+  const co = company || "your company";
+  let body = `Dear Hiring Manager,\n\n`;
+  body += `I'm writing to apply for ${role} at ${co}. `;
+  if (p.summary) {
+    body += p.summary + " ";
+  }
+  if (topExp) {
+    body += `\n\nIn my current role as ${topExp.role || "a professional"} at ${topExp.company}, I've focused on delivering measurable results`;
+    const firstBullet = linesToList(topExp.bullets)[0];
+    if (firstBullet) body += ` — for example, ${firstBullet.toLowerCase()}`;
+    body += `.`;
+  }
+  if (topSkills)
+    body += `\n\nMy core strengths include ${topSkills}, which I believe align well with what you're looking for in this position.`;
+  body += `\n\nI'd welcome the opportunity to discuss how my background could contribute to your team. Thank you for your time and consideration.\n\nSincerely,\n${p.name || "Your Name"}`;
+  return body;
+}
+function openCoverLetter() {
+  if (!hasAny()) {
+    showToast("⚠️ Fill in some resume details first");
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">📃 Cover letter</div>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="field-row" style="margin-bottom:12px;">
+        <input type="text" id="clCompany" placeholder="Company name (optional)">
+        <input type="text" id="clRole" placeholder="Role title (optional)">
+      </div>
+      <textarea class="modal-textarea" id="clOutput">${esc(generateCoverLetter())}</textarea>
+      <div class="modal-actions">
+        <button class="btn-sm" onclick="regenCoverLetter()">🔄 Regenerate</button>
+        <button class="btn-sm" onclick="copyCoverLetter()">📋 Copy text</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+function regenCoverLetter() {
+  const co = document.getElementById("clCompany").value.trim();
+  const role = document.getElementById("clRole").value.trim();
+  document.getElementById("clOutput").value = generateCoverLetter(co, role);
+}
+async function copyCoverLetter() {
+  const text = document.getElementById("clOutput").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("📋 Cover letter copied");
+  } catch (e) {
+    showToast("⚠️ Could not copy — select and copy manually");
+  }
+}
+
+/* ===================== SHARE RESUME LINK ===================== */
+function openShare() {
+  if (!hasAny()) {
+    showToast("⚠️ Fill in some resume details first");
+    return;
+  }
+  let url = "";
+  try {
+    const packed = btoa(encodeURIComponent(JSON.stringify(state)));
+    url = `${location.origin}${location.pathname}#data=${packed}`;
+  } catch (e) {
+    url = "";
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">🔗 Share your resume</div>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:0;">
+        This link carries your resume data inside the URL itself — no server, no account.
+        Anyone who opens it sees this exact resume in ResumeForge and can download the PDF.
+        Long resumes make a long link; that's normal.
+      </p>
+      <textarea class="modal-textarea" style="min-height:100px;" readonly id="shareUrl">${url}</textarea>
+      <div class="modal-actions">
+        <button class="btn-sm" onclick="copyShareLink()">📋 Copy link</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+async function copyShareLink() {
+  const text = document.getElementById("shareUrl").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("🔗 Link copied");
+  } catch (e) {
+    showToast("⚠️ Could not copy — select and copy manually");
+  }
+}
+function loadFromShareLink() {
+  if (location.hash.startsWith("#data=")) {
+    try {
+      const packed = location.hash.replace("#data=", "");
+      const data = JSON.parse(decodeURIComponent(atob(packed)));
+      state = deepMergeDefaults(getDefaultState(), data);
+      saveState();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/* ===================== EXPERIENCE DURATION BADGE ===================== */
+function calcDuration(start, end, current) {
+  if (!start) return "";
+  const [sy, sm] = start.split("-").map(Number);
+  let ey, em;
+  if (current || !end) {
+    const now = new Date();
+    ey = now.getFullYear();
+    em = now.getMonth() + 1;
+  } else {
+    [ey, em] = end.split("-").map(Number);
+  }
+  let months = (ey - sy) * 12 + (em - sm);
+  if (months < 0) months = 0;
+  const y = Math.floor(months / 12),
+    m = months % 12;
+  if (y === 0 && m === 0) return "";
+  let parts = [];
+  if (y > 0) parts.push(`${y} yr${y > 1 ? "s" : ""}`);
+  if (m > 0) parts.push(`${m} mo${m > 1 ? "s" : ""}`);
+  return parts.join(" ");
+}
+
+/* ===================== KEYBOARD SHORTCUTS ===================== */
+document.addEventListener("keydown", (e) => {
+  const appActive = document.getElementById("app").classList.contains("active");
+  if (!appActive) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    saveState();
+    showToast("💾 Progress saved");
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+    e.preventDefault();
+    downloadPDF();
+  }
+});
+
+/* ===================== INIT OVERRIDE ===================== */
+const _origLaunchApp = launchApp;
+window.addEventListener("DOMContentLoaded", () => {
+  initDarkMode();
+  if (loadFromShareLink()) {
+    launchApp();
+    showToast("🔗 Loaded resume from shared link");
+  }
+});
+
+/* ===================== SECTION REORDER (drag & drop) ===================== */
+let _dragId = null;
+function dragStart(e) {
+  _dragId = e.currentTarget.getAttribute("data-id");
+  e.currentTarget.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+function dragOver(e) {
+  e.preventDefault();
+  const item = e.currentTarget;
+  document
+    .querySelectorAll(".reorder-item")
+    .forEach((el) => el.classList.remove("drag-over"));
+  if (item.getAttribute("data-id") !== _dragId) item.classList.add("drag-over");
+}
+function dragDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.getAttribute("data-id");
+  if (!_dragId || targetId === _dragId) return;
+  const order = state.sectionOrder;
+  const fromIdx = order.indexOf(_dragId);
+  const toIdx = order.indexOf(targetId);
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, _dragId);
+  saveState();
+  renderFormStep();
+  renderPreview();
+}
+function dragEnd(e) {
+  document.querySelectorAll(".reorder-item").forEach((el) => {
+    el.classList.remove("dragging");
+    el.classList.remove("drag-over");
+  });
+  _dragId = null;
+}
+function toggleSectionVisible(id) {
+  const i = state.hiddenSections.indexOf(id);
+  if (i === -1) state.hiddenSections.push(id);
+  else state.hiddenSections.splice(i, 1);
+  saveState();
+  renderFormStep();
+  renderPreview();
+}
+
+/* ===================== VOICE INPUT (Web Speech API) ===================== */
+// Fully client-side dictation — no server, no API key. Works in Chrome/Edge/
+// Safari (desktop & mobile). Falls back gracefully with a toast if the
+// browser doesn't support it (e.g. Firefox).
+let _recognition = null;
+let _micActiveBtn = null;
+let voiceLang = localStorage.getItem("resumeforge_voice_lang") || "en-IN";
+
+function getSpeechAPI() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function startVoiceInput(btn) {
+  const SpeechAPI = getSpeechAPI();
+  if (!SpeechAPI) {
+    showToast("⚠️ Voice input isn't supported in this browser — try Chrome");
+    return;
+  }
+
+  // Tapping the mic again while it's listening stops it.
+  if (_recognition && _micActiveBtn === btn) {
+    _recognition.stop();
+    return;
+  }
+  // If a different field's mic was listening, stop that one first.
+  if (_recognition) {
+    _recognition.stop();
+  }
+
+  const target = btn.getAttribute("data-mic-target");
+  _recognition = new SpeechAPI();
+  _recognition.lang = voiceLang;
+  _recognition.interimResults = false;
+  _recognition.maxAlternatives = 1;
+  _micActiveBtn = btn;
+  btn.classList.add("listening");
+  btn.textContent = "⏺";
+
+  _recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript.trim();
+    if (!transcript) return;
+    applyVoiceTranscript(target, transcript);
+  };
+  _recognition.onerror = (e) => {
+    if (e.error === "no-speech") {
+      showToast("🎤 Didn't catch that — try again");
+    } else if (e.error === "not-allowed" || e.error === "permission-denied") {
+      showToast(
+        "⚠️ Microphone permission blocked — allow it in browser settings",
+      );
+    } else {
+      showToast("⚠️ Voice input error — please try again");
+    }
+  };
+  _recognition.onend = () => {
+    btn.classList.remove("listening");
+    btn.textContent = "🎤";
+    _recognition = null;
+    _micActiveBtn = null;
+  };
+  try {
+    _recognition.start();
+    showToast("🎤 Listening... speak now");
+  } catch (e) {
+    showToast("⚠️ Could not start microphone");
+  }
+}
+
+function applyVoiceTranscript(target, transcript) {
+  // Special case: the free-standing "add a skill" input isn't part of the
+  // bound state object, so we fill the DOM input directly instead of setPath.
+  if (target === "__skillInput") {
+    const inp = document.getElementById("skillInput");
+    if (inp) {
+      inp.value = transcript;
+      inp.focus();
+    }
+    showToast('🎤 Heard: "' + transcript + '" — tap Add');
+    return;
+  }
+
+  // For long-form fields (summary, bullets, descriptions) append with a
+  // newline/space instead of overwriting, so multiple dictation passes build
+  // up naturally. For short fields (name, email, etc.) just replace.
+  const isLongField =
+    /summary|bullets|desc|certifications|languages|achievements/.test(target);
+  const parts = target.split(".");
+  let obj = state;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const p = isFinite(parts[i]) ? parseInt(parts[i]) : parts[i];
+    obj = obj[p];
+  }
+  const lastKey =
+    isFinite(parts[parts.length - 1]) ?
+      parseInt(parts[parts.length - 1])
+    : parts[parts.length - 1];
+  const existing = obj[lastKey] || "";
+
+  if (isLongField && existing) {
+    obj[lastKey] =
+      existing + (target.includes("bullets") ? "\n" : " ") + transcript;
+  } else {
+    obj[lastKey] = transcript;
+  }
+
+  saveState();
+  renderFormStep(); // re-render so the input reflects the new value
+  renderPreview();
+  renderSteps();
+  updateScore();
+  showToast("🎤 Field filled from voice");
+}
+
+function toggleVoiceLang() {
+  voiceLang = voiceLang === "en-IN" ? "hi-IN" : "en-IN";
+  localStorage.setItem("resumeforge_voice_lang", voiceLang);
+  showToast(
+    voiceLang === "hi-IN" ?
+      "🎤 Voice input set to Hindi"
+    : "🎤 Voice input set to English",
+  );
+}
+
+/* ===================== RECRUITER SCAN SIMULATION ===================== */
+// Simulates the well-documented "6-second resume scan" recruiters do.
+// It overlays a moving attention heatmap on the live preview in the order
+// research shows recruiters actually look (name -> title -> most recent
+// role -> dates -> skills), then gives a plain checklist of what a scanner
+// would and wouldn't have caught in that window.
+function openRecruiterScan() {
+  if (!hasAny()) {
+    showToast("⚠️ Fill in some resume details first");
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box scan-modal-box">
+      <div class="modal-head">
+        <div class="modal-title">👁️ Recruiter scan simulation</div>
+        <button class="modal-close" onclick="stopScanAndClose(this)">✕</button>
+      </div>
+      <p class="scan-intro">Recruiters spend about <strong>6 seconds</strong> on a first pass. This replays that scan on your resume — watch where the "eyes" land, then see what did and didn't get noticed in that window.</p>
+      <div class="scan-timer" id="scanTimer">6.0s</div>
+      <div class="scan-progress-track"><div class="scan-progress-fill" id="scanProgress"></div></div>
+      <div class="scan-stage">
+        <div class="scan-paper-wrap" id="scanPaperWrap">
+          <div class="paper" id="scanPaper" style="min-height:auto;"></div>
+        </div>
+      </div>
+      <div class="scan-summary" id="scanSummary" style="display:none;"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay)
+      stopScanAndClose(overlay.querySelector(".modal-close"));
+  });
+
+  // Render the resume fresh into the scan modal (uses the same template renderer).
+  const renderer =
+    TEMPLATE_RENDERERS[state.template] || TEMPLATE_RENDERERS.sage;
+  document.getElementById("scanPaper").innerHTML = renderer(state);
+
+  runRecruiterScan();
+}
+function stopScanAndClose(closeBtn) {
+  clearInterval(_scanInterval);
+  _scanInterval = null;
+  closeBtn.closest(".modal-overlay").remove();
+}
+
+let _scanInterval = null;
+function runRecruiterScan() {
+  const wrap = document.getElementById("scanPaperWrap");
+  const paper = document.getElementById("scanPaper");
+  const timerEl = document.getElementById("scanTimer");
+  const progressEl = document.getElementById("scanProgress");
+  if (!wrap || !paper) return;
+
+  const paperRect = paper.getBoundingClientRect();
+  const scale = paperRect.height / paper.scrollHeight; // in case anything scaled it
+  const h = paper.scrollHeight;
+
+  // Attention zones as % of resume height, roughly matching real eye-tracking
+  // studies: name/header first, then most recent job title, then skills.
+  const zones = [
+    { top: 0.0, height: 0.1, left: "5%", width: "55%" }, // name/header
+    { top: 0.1, height: 0.06, left: "5%", width: "40%" }, // title/contact
+    { top: 0.18, height: 0.1, left: "5%", width: "90%" }, // most recent role
+    { top: 0.4, height: 0.1, left: "5%", width: "70%" }, // dates / next role
+    { top: 0.65, height: 0.1, left: "5%", width: "60%" }, // skills
+  ];
+  zones.forEach((z, i) => {
+    const el = document.createElement("div");
+    el.className = "scan-zone";
+    el.id = "scanZone" + i;
+    el.style.top = z.top * 100 + "%";
+    el.style.height = z.height * 100 + "%";
+    el.style.left = z.left;
+    el.style.width = z.width;
+    wrap.appendChild(el);
+  });
+
+  const totalMs = 6000;
+  const stepMs = 100;
+  let elapsed = 0;
+  const zoneCount = zones.length;
+  const perZoneMs = totalMs / zoneCount;
+
+  clearInterval(_scanInterval);
+  _scanInterval = setInterval(() => {
+    elapsed += stepMs;
+    const remaining = Math.max(0, (totalMs - elapsed) / 1000).toFixed(1);
+    timerEl.textContent = remaining + "s";
+    progressEl.style.width = Math.min(100, (elapsed / totalMs) * 100) + "%";
+
+    const activeZoneIdx = Math.min(
+      zoneCount - 1,
+      Math.floor(elapsed / perZoneMs),
+    );
+    zones.forEach((z, i) => {
+      const el = document.getElementById("scanZone" + i);
+      if (el) el.classList.toggle("on", i === activeZoneIdx);
+    });
+
+    if (elapsed >= totalMs) {
+      clearInterval(_scanInterval);
+      zones.forEach((z, i) => {
+        const el = document.getElementById("scanZone" + i);
+        if (el) el.classList.remove("on");
+      });
+      showScanSummary();
+    }
+  }, stepMs);
+}
+
+function showScanSummary() {
+  const summary = document.getElementById("scanSummary");
+  if (!summary) return;
+  const checks = buildScanChecklist();
+  summary.style.display = "block";
+  summary.innerHTML = `
+    <div style="font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin-bottom:6px;">What a 6-second scan caught</div>
+    ${checks
+      .map(
+        (c) => `
+      <div class="scan-row">
+        <span>${c.label}</span>
+        <span class="scan-badge ${c.status}">${c.badgeText}</span>
+      </div>
+    `,
+      )
+      .join("")}
+    <div style="text-align:center;margin-top:16px;">
+      <button class="btn-sm" onclick="runRecruiterScan(); document.getElementById('scanSummary').style.display='none';">🔄 Replay scan</button>
+    </div>
+  `;
+}
+function buildScanChecklist() {
+  const p = state.personal;
+  const topExp = state.experience.find((e) => e.company);
+  const checks = [];
+  checks.push({
+    label: "Name is clear at the top",
+    status: p.name ? "good" : "bad",
+    badgeText: p.name ? "Caught" : "Missing",
+  });
+  checks.push({
+    label: "Job title / headline visible early",
+    status: p.role ? "good" : "warn",
+    badgeText: p.role ? "Caught" : "Add one",
+  });
+  checks.push({
+    label: "Most recent role stands out",
+    status: topExp && topExp.role ? "good" : "bad",
+    badgeText: topExp && topExp.role ? "Caught" : "Missing",
+  });
+  const hasMetric = topExp && /\d/.test(topExp.bullets || "");
+  checks.push({
+    label: "A number/metric in top bullet (grabs attention)",
+    status: hasMetric ? "good" : "warn",
+    badgeText: hasMetric ? "Found" : "None found",
+  });
+  checks.push({
+    label: "Skills visible without scrolling far",
+    status: state.skills.length >= 3 ? "good" : "warn",
+    badgeText: state.skills.length >= 3 ? "Caught" : "Add more",
+  });
+  const longBullets = state.experience.some((e) =>
+    linesToList(e.bullets).some((b) => b.split(" ").length > 28),
+  );
+  checks.push({
+    label: "Bullet points are scan-friendly length",
+    status: longBullets ? "warn" : "good",
+    badgeText: longBullets ? "Too long" : "Good",
+  });
+  return checks;
+}
+
+/* ===================== ACADEMIC CV FORM EXTRAS ===================== */
+// Academic CVs need publications and research fields that a normal resume
+// doesn't. Rather than force every user through these fields, they only
+// appear in the Extras step when the Academic template is selected, and the
+// data lives in state.academic so switching back to a regular template
+// never loses it.
+function academicExtrasHTML() {
+  if (state.template !== "academic") return "";
+  const a = state.academic;
+  return `
+    <div style="height:1px;background:var(--line);margin:22px 0;"></div>
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:0 0 4px;">Academic details</h3>
+    <p class="section-desc">Shown only in the Academic CV template.</p>
+    ${field("Publications", "", `<textarea data-bind="academic.publications" rows="4" placeholder="Author, A. (2023). Title of paper. Journal Name, Vol(Issue), pages.\\nOne citation per line">${esc(a.publications)}</textarea>`, true)}
+    ${field("Research interests", "", `<textarea data-bind="academic.research" rows="3" placeholder="Machine learning fairness, natural language processing, ...">${esc(a.research)}</textarea>`, true)}
+    ${field("Conferences & presentations", "", `<textarea data-bind="academic.conferences" rows="3" placeholder="Presented at XYZ Conference, 2023\\nOne per line">${esc(a.conferences)}</textarea>`, true)}
+    ${field("Teaching experience", "", `<textarea data-bind="academic.teaching" rows="3" placeholder="Teaching Assistant, Course Name, Semester">${esc(a.teaching)}</textarea>`, true)}
+    ${field("Grants & funding", "", `<textarea data-bind="academic.grants" rows="2" placeholder="Grant name, funding body, year">${esc(a.grants)}</textarea>`, true)}
+  `;
 }
