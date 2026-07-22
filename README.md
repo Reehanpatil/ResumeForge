@@ -1,4 +1,4 @@
-![PREFLIGHT Score](https://img.shields.io/badge/PREFLIGHT-90%2F100-3ED88B)
+![PREFLIGHT Score](https://img.shields.io/badge/PREFLIGHT-98%2F100-3ED88B)
 
 # 🚀 ResumeForge
 
