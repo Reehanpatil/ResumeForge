@@ -1,3 +1,5 @@
+![PREFLIGHT Score](https://img.shields.io/badge/PREFLIGHT-63%2F100-F5A623)
+
 # ResumeForge
 
 A JavaScript project
